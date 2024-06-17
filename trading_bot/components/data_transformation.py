@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import ta
 import math
+from statsmodels.tsa.stattools import adfuller
 
 
 class DataTransformation():
@@ -450,5 +451,35 @@ class DataTransformation():
         df_copy["kama_diff"] = df_copy[f"kama_{m}"] - df_copy[f"kama_{n}"]
         df_copy["kama_trend"] = -1
         df_copy.loc[0<df_copy["kama_diff"], "kama_trend"] = 1
+        
+        return df_copy
+    
+    @staticmethod
+    def create_rolling_adf_feat(df, col, window_size=30):
+        """
+        Calculates the Augmented Dickey-Fuller test statistic on a rolling window
+
+        Args:
+            df (pd.DataFrame): DataFrame containing the column on which to perform the ADF test
+            col (str): the name of the column on which to perform the ADF test
+            window_size (int): the size of the rolling window
+
+        Returns:
+            pd.DataFrame: a new DataFrame with an additional column containing the rolling ADF test statistic
+        """
+        df_copy = df.copy()
+        
+        # Create an empty series to store rolling ADF test statistic
+        rolling_adf_stat = pd.Series(dtype='float64', index=df_copy.index)
+
+        # Loop through the DataFrame by `window_size` and apply `adfuller`.
+        for i in range(window_size, len(df)):
+            window = df_copy[col].iloc[i-window_size:i]
+            adf_result = adfuller(window)
+            adf_stat = adf_result[0]
+            rolling_adf_stat.at[df_copy.index[i]] = adf_stat
+
+        # Add the rolling ADF test statistic series to the original DataFrame
+        df_copy['rolling_adf_stat'] = rolling_adf_stat
         
         return df_copy
