@@ -177,3 +177,67 @@ class DataTransformation():
         df_copy['rolling_volatility_yang_zhang'] = rolling_volatility
         
         return df_copy
+    
+    @staticmethod
+    def create_displacement_detection_feats(df, type_range="standard", strengh=3, period=100):
+        """
+        This function calculates and adds a 'displacement' column to a provided DataFrame. Displacement is determined based on
+        the 'candle_range' which is calculated differently according to the 'type_range' parameter. Then, it calculates the
+        standard deviation of the 'candle_range' over a given period and sets a 'threshold'. If 'candle_range' exceeds this 
+        'threshold', a displacement is detected and marked as 1 in the 'displacement' column.
+
+        Args:
+            df (pd.DataFrame): the DataFrame to add the columns to, this DataFrame should have 'open', 'close', 'high', 
+                               and 'low' columns
+            type_range (str, optional): defines how to calculate 'candle_range'. 'standard' calculates it as the absolute difference 
+                                        between 'close' and 'open', 'extremum' calculates it as the absolute difference between 
+                                        'high' and 'low', default is 'standard'
+            strengh (int, optional): the multiplier for the standard deviation to set the 'threshold', default is 3
+            period (int, optional): the period to use for calculating the standard deviation, default is 100
+
+        Returns:
+            pd.DataFrame: the original DataFrame, but with four new columns: 'candle_range', 'MSTD', 'threshold' and 'displacement'
+
+        Raises:
+        ValueError: If an unsupported 'type_range' is provided.
+        """
+        df_copy = df.copy()
+
+        # Choose your type_range
+        if type_range == "standard":
+            df_copy["candle_range"] = np.abs(df_copy["close"] - df_copy["open"])
+        elif type_range == "extremum":
+            df_copy["candle_range"] = np.abs(df_copy["high"] - df_copy["low"])
+        else:
+            raise ValueError("Put a right format of type range")
+
+        # Compute the STD of the candle range
+        df_copy["MSTD"] = df_copy["candle_range"].rolling(period).std()
+        df_copy["threshold"] = df_copy["MSTD"] * strengh
+
+        # Displacement if the candle range is above the threshold
+        df_copy["displacement"] = np.nan
+        df_copy.loc[df_copy["threshold"] < df_copy["candle_range"], "displacement"] = 1
+        df_copy["variation"] = df_copy["close"] - df_copy["open"]
+
+        # Specify the way of the displacement
+        df_copy["green_displacement"] = 0
+        df_copy["red_displacement"] = 0
+
+        df_copy.loc[(df_copy["displacement"] == 1) & (0 < df_copy["variation"]), "green_displacement"] = 1
+        df_copy.loc[(df_copy["displacement"] == 1) & (df_copy["variation"] < 0), "red_displacement"] = 1
+
+        # Shift by one because we only know that we have a displacement at the end of the candle (BE CAREFUL)
+        df_copy["green_displacement"] = df_copy["green_displacement"].shift(1)
+        df_copy["red_displacement"] = df_copy["red_displacement"].shift(1)
+
+        df_copy["high_displacement"] = np.nan
+        df_copy["low_displacement"] = np.nan
+
+        df_copy.loc[df_copy["displacement"] == 1, "high_displacement"] = df_copy["high"]
+        df_copy.loc[df_copy["displacement"] == 1, "low_displacement"] = df_copy["low"]
+
+        df_copy["high_displacement"] = df_copy["high_displacement"].fillna(method="ffill")
+        df_copy["low_displacement"] = df_copy["low_displacement"].fillna(method="ffill")
+
+        return df_copy
