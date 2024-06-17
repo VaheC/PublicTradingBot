@@ -53,7 +53,37 @@ class DataTransformation():
         return df_copy
     
     @staticmethod
-    def kama(df, col, n):
+    def create_kama_feat(df, col, n):
+        '''Calculates KAMA indicator using ta library
+
+           Args:
+               df (pd.DataFrame): original data
+               col (str): the column for which the indicator should be calculated
+
+           Returns:
+               pd.DataFrame: original data + a column with KAMA indicator
+        '''
         df_copy = df.copy()
         df_copy[f"kama_{n}"] = ta.momentum.KAMAIndicator(df_copy[col], n).kama()
+        return df_copy
+    
+    @staticmethod
+    def derivatives(df,col):
+        """
+        Calculates the first and second derivatives of a given column in a DataFrame 
+        and adds them as new columns 'velocity' and 'acceleration'.
+
+        Args:
+            df (pd.DataFrame): the DataFrame containing the column for which derivatives are to be calculated
+            
+            col (str): the column name for which the first and second derivatives are to be calculated
+
+        Returns:
+            pd.DataFrame: a new DataFrame with 'velocity' and 'acceleration' columns added
+
+        """
+        
+        df_copy = df.copy()
+        df_copy["velocity"] = df_copy[col].diff().fillna(0)
+        df_copy["acceleration"] = df_copy["velocity"].diff().fillna(0)    
         return df_copy
