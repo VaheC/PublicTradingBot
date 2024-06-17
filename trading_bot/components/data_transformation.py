@@ -428,3 +428,27 @@ class DataTransformation():
         
         return df_copy
     
+    @staticmethod
+    def create_kama_market_regime_feats(df, col, n, m):
+        """
+        Calculates the Kaufman's Adaptive Moving Average (KAMA) to determine market regime
+        
+        Args:
+            df (pd.DataFrame): input DataFrame containing price data or other numeric series
+            col (str): the column name in the DataFrame to apply KAMA
+            n (int): the period length for the first KAMA calculation
+            m (int): the period length for the second KAMA calculation
+
+        Returns:
+            pd.DataFrame: DataFrame with additional columns "kama_diff" and "kama_trend" indicating the market trend
+        """
+        
+        df_copy = df.copy()
+        df_copy = DataTransformation.create_kama_feat(df_copy, col, n)
+        df_copy = DataTransformation.create_kama_feat(df_copy, col, m)
+        
+        df_copy["kama_diff"] = df_copy[f"kama_{m}"] - df_copy[f"kama_{n}"]
+        df_copy["kama_trend"] = -1
+        df_copy.loc[0<df_copy["kama_diff"], "kama_trend"] = 1
+        
+        return df_copy
