@@ -241,3 +241,189 @@ class DataTransformation():
         df_copy["low_displacement"] = df_copy["low_displacement"].fillna(method="ffill")
 
         return df_copy
+    
+    @staticmethod
+    def get_dc_event(Pt, Pext, threshold):
+        """
+        Computes whether there is a POTENTIAL DC event or not
+
+        Args:
+            Pt ():
+            Pext ():
+
+        Returns:
+            int: 
+        """
+        var = (Pt - Pext) / Pext
+        
+        if threshold <= var:
+            dc = 1
+        elif var <= -threshold:
+            dc = -1
+        else:
+            dc = 0
+            
+        return dc
+
+    @staticmethod
+    def calculate_dc(df, threshold):
+        """
+        Computes the start and the end of a DC event
+
+        Args:
+            df (pd.DataFrame): original data
+            threshold (): 
+
+        Returns:
+            tuple: 
+        """
+        
+        # Initialize lists to store DC and OS events
+        dc_events_up = []
+        dc_events_down = []
+        dc_events = []
+        os_events = []
+
+        # Initialize the first DC event
+        last_dc_price = df["close"][0]
+        last_dc_direction = 0  # +1 for up, -1 for down
+        
+        # Initialize the current Min & Max for the OS events
+        min_price = last_dc_price
+        max_price = last_dc_price
+        idx_min = 0
+        idx_max = 0
+
+        
+        # Iterate over the price list
+        for i, current_price in enumerate(df["close"]):
+            
+            # Update min & max prices
+            try:
+                max_price = df["high"].iloc[dc_events[-1][-1]:i].max()
+                min_price = df["low"].iloc[dc_events[-1][-1]:i].min()
+                idx_min = df["high"].iloc[dc_events[-1][-1]:i].idxmin()
+                idx_max = df["low"].iloc[dc_events[-1][-1]:i].idxmax()
+            except Exception as e:
+                pass
+                #print(e, dc_events, i)
+                #print("We are computing the first DC")
+            
+            # Calculate the price change in percentage
+            dc_price_min = DataTransformation.get_dc_event(current_price, min_price, threshold)
+            dc_price_max = DataTransformation.get_dc_event(current_price, max_price, threshold)
+            
+            
+            # Add the DC event with the right index IF we are in the opposite way
+            # Because if we are in the same way, we just increase the OS event size
+            if (last_dc_direction!=1) & (dc_price_min==1):
+                dc_events_up.append([idx_min, i])
+                dc_events.append([idx_min, i])
+                last_dc_direction = 1
+                
+            elif (last_dc_direction!=-1) & (dc_price_max==-1):
+                dc_events_down.append([idx_max, i])
+                dc_events.append([idx_max, i])
+                last_dc_direction = -1
+            
+        return dc_events_up, dc_events_down, dc_events
+
+    @staticmethod
+    def calculate_trend(dc_events_down, dc_events_up, df):
+        """
+        Computes the DC + OS period (trend) using the DC event lists
+
+        Args:
+            dc_events_down ():
+            dc_events_up ():
+            df (pd.DataFrame): original data
+
+        Returns:
+            tuple: 
+        """
+        
+        # Initialize the variables
+        trend_events_up = []
+        trend_events_down = []
+        
+        # Verify which event occured first (upward or downward movement)
+        
+        # If the first event is a downward event
+        if dc_events_down[0][0]==0:
+            
+            # Iterate on the index 
+            for i in range(len(dc_events_down)):
+                
+                # If it is the value before the last one we break the loop
+                if i==len(dc_events_down)-1:
+                    break
+                    
+                # Calculate the start and end for each trend
+                trend_events_up.append([dc_events_up[i][1], dc_events_down[i+1][1]])
+                trend_events_down.append([dc_events_down[i][1], dc_events_up[i][1]])
+        
+        # If the first event is a upward event
+        elif dc_events_up[0][0]==0:
+            
+            # Iterate on the index
+            for i in range(len(dc_events_up)):
+                
+                # If it is the value before the last one we break the loop
+                if i==len(dc_events_up)-1:
+                    break
+                    
+                # Calculate the start and end for each trend
+                trend_events_up.append([dc_events_down[i][1], dc_events_up[i+1][1]])
+                trend_events_down.append([dc_events_up[i][1], dc_events_down[i][1]])
+
+        # Verify the last indexed value for the down ward and the upward trends
+        last_up = trend_events_up[-1][1]
+        last_down = trend_events_down[-1][1]
+
+        # Find which trend occured last to make it go until now
+        if last_down < last_up:
+            trend_events_up[-1][1] = len(df)-1
+        else:
+            trend_events_down[-1][1] = len(df)-1
+            
+        return trend_events_down, trend_events_up
+
+    def get_dc_price(dc_events, df):
+        dc_events_prices = []
+        for event in dc_events:
+            prices = [df["close"].iloc[event[0]], df["close"].iloc[event[1]]]
+            dc_events_prices.append(prices)
+        return dc_events_prices
+    
+    @staticmethod
+    def DC_market_regime(df, threshold):
+        """
+        Determines the market regime based on Directional Change (DC) and trend events.
+        
+        Args:
+        df (pd.DataFrame): a DataFrame containing financial data, the DataFrame should contain a 'close' column 
+                           with the closing prices, and 'high' and 'low' columns for high and low prices
+        threshold (float): the percentage threshold for DC events
+        
+        Returns:
+            pd.DataFrame: a new DataFrame containing the original data and a new column "market_regime", 
+                          which indicates the market regime at each timestamp, a value of 1 indicates 
+                          an upward trend, and a value of 0 indicates a downward trend
+            
+        """
+        df_copy = df.copy()
+        
+        # Extract DC and Trend events
+        dc_events_up, dc_events_down, dc_events = DataTransformation.calculate_dc(df_copy, threshold=threshold)
+        trend_events_down, trend_events_up = DataTransformation.calculate_trend(dc_events_down, dc_events_up, df_copy)
+        
+        df_copy["market_regime"] = np.nan
+        for event_up in trend_events_up:
+            df_copy.loc[event_up[1], "market_regime"] = 0
+
+        for event_down in trend_events_down:
+            df_copy.loc[event_down[1], "market_regime"] = 1
+
+        df_copy["market_regime"] = df_copy["market_regime"].fillna(method="ffill")
+        
+        return df_copy
