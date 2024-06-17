@@ -396,7 +396,7 @@ class DataTransformation():
         return dc_events_prices
     
     @staticmethod
-    def DC_market_regime(df, threshold):
+    def create_dc_market_regime_feat(df, threshold):
         """
         Determines the market regime based on Directional Change (DC) and trend events.
         
@@ -427,3 +427,4 @@ class DataTransformation():
         df_copy["market_regime"] = df_copy["market_regime"].fillna(method="ffill")
         
         return df_copy
+    
