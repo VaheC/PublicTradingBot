@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 
 class DataTransformation():
@@ -24,4 +25,28 @@ class DataTransformation():
         df_copy = df.copy()
         df_copy[f'autocorr_{lag}'] = df_copy[col].rolling(window=n, min_periods=n, center=False).\
             apply(lambda x: x.autocorr(lag=lag), raw=False)
+        return df_copy
+    
+    @staticmethod
+    def create_candle_info_feats(df):
+        '''Creates candle color, filling, and amplitude features
+
+            Args:
+                df (pd.DataFrame): original data
+
+            Returns:
+                pd.DataFrame: original data + 3 new columns/features
+        '''
+        df_copy = df.copy()
+
+        # Candle color
+        df_copy["candle_way"] = -1
+        df_copy.loc[(df_copy["open"] - df_copy["close"]) < 0, "candle_way"] = 1
+
+        # Filling percentage
+        df_copy["filling"] = np.abs(df_copy["close"] - df_copy["open"]) / np.abs(df_copy["high"] - df_copy["low"])
+
+        # Amplitude
+        df_copy["amplitude"] = np.abs(df_copy["close"] - df_copy["open"]) / ((df_copy["open"] + df_copy["close"]) / 2) * 100
+
         return df_copy
