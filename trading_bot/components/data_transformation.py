@@ -68,7 +68,7 @@ class DataTransformation():
         return df_copy
     
     @staticmethod
-    def derivatives(df,col):
+    def create_derivatives_feats(df,col):
         """
         Calculates the first and second derivatives of a given column in a DataFrame 
         and adds them as new columns 'velocity' and 'acceleration'.
@@ -86,4 +86,20 @@ class DataTransformation():
         df_copy = df.copy()
         df_copy["velocity"] = df_copy[col].diff().fillna(0)
         df_copy["acceleration"] = df_copy["velocity"].diff().fillna(0)    
+        return df_copy
+    
+    @staticmethod
+    def create_spread_feat(df):
+        """
+        Calculates the spread between the 'high' and 'low' columns of a given DataFrame 
+        and adds it as a new column named 'spread'.
+
+        Args:
+            df (pd.DataFrame): the DataFrame containing the 'high' and 'low' columns for which the spread is to be calculated
+
+        Returns:
+            pd.DataFrame: a new DataFrame with the 'spread' column added
+        """
+        df_copy = df.copy()
+        df_copy["spread"] = df_copy["high"] - df_copy["low"]
         return df_copy
