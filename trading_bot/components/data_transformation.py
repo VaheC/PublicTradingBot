@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import ta
+import math
 
 
 class DataTransformation():
@@ -102,4 +103,77 @@ class DataTransformation():
         """
         df_copy = df.copy()
         df_copy["spread"] = df_copy["high"] - df_copy["low"]
+        return df_copy
+    
+    @staticmethod
+    def create_moving_parkinson_estimator_feat(df, window_size=30):
+        """
+        Calculate Parkinson's volatility estimator based on high and low prices.
+
+        Args:
+            df (pd.DataFrame): DataFrame containing 'high' and 'low' columns for each trading period
+            window_size (int): size of moving window for the calculation
+
+        Returns:
+            pd.DataFrame: original data + a column with the estimated volatility based on Parkinson's method
+        """
+        def parkinson_estimator(df):
+            N = len(df)
+            sum_squared = np.sum(np.log(df['high'] / df['low']) ** 2)
+
+            volatility = math.sqrt((1 / (4 * N * math.log(2))) * sum_squared)
+            return volatility
+        
+        df_copy = df.copy()
+        # Create an empty series to store mobile volatility
+        rolling_volatility = pd.Series(dtype='float64')
+
+        # Browse the DataFrame by window size `window_size` and apply `parkinson_estimator`.
+        for i in range(window_size, len(df)):
+            window = df_copy.loc[df_copy.index[i-window_size]: df_copy.index[i]]
+            volatility = parkinson_estimator(window)
+            rolling_volatility.at[df_copy.index[i]] = volatility
+
+        # Add the mobile volatility series to the original DataFrame
+        df_copy['rolling_volatility_parkinson'] = rolling_volatility
+        
+        return df_copy
+    
+    @staticmethod
+    def create_moving_yang_zhang_estimator_feat(df, window_size=30):
+        """
+        Calculate Yang-Zhang's volatility estimator based on high and low prices.
+
+        Args:
+            df (pd.DataFrame): DataFrame containing 'high' and 'low' columns for each trading period
+            window_size (int): size of moving window for the calculation
+
+        Returns:
+            pd.DataFrame: original data + a column with the estimated volatility based on Yang-Zhang's method
+        """
+        def yang_zhang_estimator(df):
+            N = len(window)
+        
+            term1 = np.log(window['high'] / window['close']) * np.log(window['high'] / window['open'])
+            term2 = np.log(window['low'] / window['close']) * np.log(window['low'] / window['open'])
+
+            sum_squared = np.sum(term1 + term2)
+            volatility = np.sqrt(sum_squared / N)
+
+            return volatility
+        
+        df_copy = df.copy()
+        
+        # Create an empty series to store mobile volatility
+        rolling_volatility = pd.Series(dtype='float64')
+
+        # Browse the DataFrame by window size `window_size` and apply `yang_zhang_estimator`.
+        for i in range(window_size, len(df)):
+            window = df_copy.loc[df_copy.index[i-window_size]: df_copy.index[i]]
+            volatility = yang_zhang_estimator(window)
+            rolling_volatility.at[df_copy.index[i]] = volatility
+
+        # Add the mobile volatility series to the original DataFrame
+        df_copy['rolling_volatility_yang_zhang'] = rolling_volatility
+        
         return df_copy
