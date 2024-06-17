@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import ta
 
 
 class DataTransformation():
@@ -49,4 +50,10 @@ class DataTransformation():
         # Amplitude
         df_copy["amplitude"] = np.abs(df_copy["close"] - df_copy["open"]) / ((df_copy["open"] + df_copy["close"]) / 2) * 100
 
+        return df_copy
+    
+    @staticmethod
+    def kama(df, col, n):
+        df_copy = df.copy()
+        df_copy[f"kama_{n}"] = ta.momentum.KAMAIndicator(df_copy[col], n).kama()
         return df_copy
